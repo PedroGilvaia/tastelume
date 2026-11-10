@@ -1,0 +1,107 @@
+tastelume/
+│
+├── .env.example                  # Exemplo de configuração: passwords, tokens e portas
+├── .gitignore                    # Ficheiros que não devem ser enviados para o Git
+├── README.md                     # Descrição, estado atual e instruções de execução
+├── docker-compose.yml             # Configura os microserviços, bases de dados e volumes
+│
+├── mobile_app/                    # Onde serão criados os ecrãs, navegação, ViewModels, modelos de dados e clientes das APIs
+│
+├── docs/
+│   └── architecture.md            # Documentação da arquitetura e comunicação dos serviços
+│
+└── services/                      # Contém os 4 microserviços. Na configuração do Docker Compose cada um contém a sua própria database PostgreSQL
+    │
+    ├── users_service/             # Autenticação, perfis e seguidores
+    │   │
+    │   ├── .dockerignore          # Exclui ficheiros desnecessários da imagem Docker
+    │   ├── Dockerfile             # Define como construir o contentor do serviço
+    │   ├── requirements.txt       # Dependências Python de execução
+    │   ├── requirements-dev.txt   # Dependências adicionais de desenvolvimento e testes
+    │   ├── alembic.ini            # Configuração das migrações da base de dados
+    │   ├── pytest.ini             # Configuração dos testes
+    │   │
+    │   ├── app/
+    │   │   ├── __init__.py        # Identifica o pacote Python
+    │   │   ├── main.py            # Inicializa a API FastAPI e os endpoints
+    │   │   ├── config.py          # Lê as configurações do ambiente
+    │   │   ├── database.py        # Liga à base de dados através do SQLAlchemy
+    │   │   ├── deps.py            # Autenticação e controlo de acesso
+    │   │   ├── events.py          # Envia eventos para o Activity Service
+    │   │   ├── models.py          # Modelos das tabelas de utilizadores e seguidores
+    │   │   ├── schemas.py         # Validação dos pedidos e respostas
+    │   │   ├── security.py        # Hashing de passwords e tokens JWT
+    │   │   │
+    │   │   └── routers/
+    │   │       ├── __init__.py    # Identifica o pacote dos routers
+    │   │       ├── auth.py        # Registo e login
+    │   │       ├── users.py       # Perfis, pesquisa e seguidores
+    │   │       └── internal.py    # Endpoints de comunicação entre serviços
+    │   │
+    │   ├── migrations/            # Permite criar e atualizar a estrutura das bases de dados de forma controlada
+    │   │   ├── env.py             # Liga o Alembic aos modelos
+    │   │   └── versions/
+    │   │       └── 0001_initial.py # Criação inicial das tabelas
+    │   │
+    │   └── tests/                 # Verifica o comportamento do código
+    │       ├── conftest.py        # Configuração e dados auxiliares dos testes
+    │       ├── test_auth.py       # Testes de autenticação
+    │       ├── test_follows.py    # Testes de seguidores
+    │       ├── test_internal.py   # Testes dos endpoints internos
+    │       ├── test_migrations.py # Testes das migrações
+    │       └── test_profiles.py   # Testes dos perfis
+    │
+    ├── recipe_service/            # Publicação, pesquisa e consulta de receitas
+    │   │
+    │   ├── .dockerignore          # Exclui ficheiros locais da imagem Docker
+    │   ├── Dockerfile             # Define o contentor do serviço
+    │   ├── requirements.txt       # Dependências Python de execução
+    │   ├── requirements-dev.txt   # Dependências de desenvolvimento e testes
+    │   ├── alembic.ini            # Configuração das migrações
+    │   ├── pytest.ini             # Configuração dos testes
+    │   │
+    │   ├── app/
+    │   │   ├── __init__.py        # Identifica o pacote Python
+    │   │   ├── main.py            # Inicializa a API e as categorias
+    │   │   ├── auth.py            # Valida JWT e tokens internos
+    │   │   ├── categories.py      # Define as categorias de receitas
+    │   │   ├── clients.py         # Comunica com Users e Activity
+    │   │   ├── config.py          # Configurações do serviço
+    │   │   ├── database.py        # Ligação à base de dados
+    │   │   ├── images.py          # Guarda, valida e elimina fotografias
+    │   │   ├── models.py          # Modelos de receitas, categorias e visualizações
+    │   │   ├── schemas.py         # Validação dos dados das receitas
+    │   │   │
+    │   │   └── routers/
+    │   │       ├── __init__.py    # Identifica o pacote dos routers
+    │   │       ├── internal.py    # Consultas internas e atualização de contadores
+    │   │       └── recipes.py     # CRUD, pesquisa, imagens e visualizações
+    │   │
+    │   ├── migrations/
+    │   │   ├── env.py             # Configura as migrações
+    │   │   └── versions/
+    │   │       └── 0001_initial.py # Criação inicial das tabelas
+    │   │
+    │   └── tests/
+    │       ├── conftest.py        # Fixtures e utilitários para os testes
+    │       ├── test_recipes.py    # Testes de receitas, pesquisa e ordenação
+    │       └── test_views_images_internal.py
+    │                                # Testes de imagens, visualizações e endpoints internos
+    │
+    ├── interaction_service/       # Comentários, likes, avaliações e mensagens
+    │   │
+    │   ├── .dockerignore          # Exclui ficheiros locais do contentor
+    │   ├── Dockerfile             # Define o contentor do serviço
+    │   ├── requirements.txt       # Dependências Python
+    │   └── app/
+    │       ├── __init__.py        # Identifica o pacote Python
+    │       └── main.py            # API inicial; atualmente só inclui /health
+    │
+    └── activity_service/          # Eventos, notificações e estatísticas
+        │
+        ├── .dockerignore          # Exclui ficheiros locais do contentor
+        ├── Dockerfile             # Define o contentor do serviço
+        ├── requirements.txt       # Dependências Python
+        └── app/
+            ├── __init__.py        # Identifica o pacote Python
+            └── main.py            # API inicial; atualmente só inclui /health

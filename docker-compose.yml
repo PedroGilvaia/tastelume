@@ -1,0 +1,120 @@
+# Tastelume — 4 microserviços, cada um com a sua base de dados PostgreSQL.
+# Arranque: cp .env.example .env && docker compose up --build
+
+x-service-env: &service-env
+  JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
+  INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?defina INTERNAL_SERVICE_TOKEN no .env}
+  CORS_ORIGINS: ${CORS_ORIGINS:-*}
+  USERS_SERVICE_URL: http://users_service:8000
+  RECIPE_SERVICE_URL: http://recipe_service:8000
+  INTERACTION_SERVICE_URL: http://interaction_service:8000
+  ACTIVITY_SERVICE_URL: http://activity_service:8000
+
+x-healthcheck: &app-healthcheck
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+  start_period: 15s
+
+services:
+  # ---------------- Users ----------------
+  users_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: users
+      POSTGRES_PASSWORD: ${USERS_DB_PASSWORD:?}
+      POSTGRES_DB: users
+    volumes: [users_db_data:/var/lib/postgresql/data]
+    healthcheck: &pg-health
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  users_service:
+    build: ./services/users_service
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql+psycopg2://users:${USERS_DB_PASSWORD}@users_db:5432/users
+    ports: ["${USERS_PORT:-8001}:8000"]
+    depends_on:
+      users_db: {condition: service_healthy}
+    healthcheck: *app-healthcheck
+    restart: unless-stopped
+
+  # ---------------- Recipe ----------------
+  recipe_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: recipe
+      POSTGRES_PASSWORD: ${RECIPE_DB_PASSWORD:?}
+      POSTGRES_DB: recipe
+    volumes: [recipe_db_data:/var/lib/postgresql/data]
+    healthcheck: *pg-health
+    restart: unless-stopped
+
+  recipe_service:
+    build: ./services/recipe_service
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql+psycopg2://recipe:${RECIPE_DB_PASSWORD}@recipe_db:5432/recipe
+      IMAGE_DIR: /data/images
+    volumes: [recipe_images:/data/images]
+    ports: ["${RECIPE_PORT:-8002}:8000"]
+    depends_on:
+      recipe_db: {condition: service_healthy}
+    healthcheck: *app-healthcheck
+    restart: unless-stopped
+
+  # ---------------- Interaction ----------------
+  interaction_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: interaction
+      POSTGRES_PASSWORD: ${INTERACTION_DB_PASSWORD:?}
+      POSTGRES_DB: interaction
+    volumes: [interaction_db_data:/var/lib/postgresql/data]
+    healthcheck: *pg-health
+    restart: unless-stopped
+
+  interaction_service:
+    build: ./services/interaction_service
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql+psycopg2://interaction:${INTERACTION_DB_PASSWORD}@interaction_db:5432/interaction
+    ports: ["${INTERACTION_PORT:-8003}:8000"]
+    depends_on:
+      interaction_db: {condition: service_healthy}
+    healthcheck: *app-healthcheck
+    restart: unless-stopped
+
+  # ---------------- Activity ----------------
+  activity_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: activity
+      POSTGRES_PASSWORD: ${ACTIVITY_DB_PASSWORD:?}
+      POSTGRES_DB: activity
+    volumes: [activity_db_data:/var/lib/postgresql/data]
+    healthcheck: *pg-health
+    restart: unless-stopped
+
+  activity_service:
+    build: ./services/activity_service
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql+psycopg2://activity:${ACTIVITY_DB_PASSWORD}@activity_db:5432/activity
+    ports: ["${ACTIVITY_PORT:-8004}:8000"]
+    depends_on:
+      activity_db: {condition: service_healthy}
+    healthcheck: *app-healthcheck
+    restart: unless-stopped
+
+volumes:
+  users_db_data:
+  recipe_db_data:
+  interaction_db_data:
+  activity_db_data:
+  recipe_images:
