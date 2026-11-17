@@ -1,20 +1,27 @@
-"""Esqueleto da Fase 1: health check e ligação à base de dados. Endpoints de negócio: fases seguintes."""
-import os
+from fastapi import Depends, FastAPI, Response
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from fastapi import FastAPI, Response
-from sqlalchemy import create_engine, text
+from .config import settings
+from .database import get_db
+from .routers import events, notifications, stats
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./dev.db")
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-
-app = FastAPI(title="Tastelume — Activity Service", version="0.0.1")
+app = FastAPI(
+    title="Tastelume — Activity Service",
+    version="0.1.0",
+    description="Eventos, notificações e estatísticas de atividade.",
+)
+app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"],
+                   allow_headers=["*"], expose_headers=["X-Total-Count", "X-Unread-Count"])
+for r in (events.router, notifications.router, stats.router):
+    app.include_router(r)
 
 
 @app.get("/health", tags=["health"])
-def health(response: Response):
+def health(response: Response, db: Session = Depends(get_db)):
     try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+        db.execute(text("SELECT 1"))
     except Exception:
         response.status_code = 503
         return {"status": "unavailable", "service": "activity"}

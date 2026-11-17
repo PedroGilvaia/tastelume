@@ -3,23 +3,34 @@
 Rede social de receitas culinárias — trabalho académico de desenvolvimento de aplicações móveis.
 Flutter (MVVM + Provider) + 4 microserviços FastAPI, cada um com a sua base de dados PostgreSQL, orquestrados com Docker Compose.
 
-## Estado atual (Fases 1–3 do backend concluídas; Activity Service e Flutter por fazer)
+## Estado
 
 | Componente | Estado |
 |---|---|
-| **Users Service** (registo, login JWT, perfis, interesses, seguidores, endpoints internos) | ✅ Implementado, 23 testes automatizados a passar |
-| **Recipe Service** (CRUD, categorias, pesquisa/ordenação/paginação, imagens, visualizações, personalização, endpoints internos) | ✅ Implementado, 30 testes automatizados a passar; validado com Users Service real via HTTP |
-| **Interaction Service** (comentários, likes, avaliações, favoritos, partilhas, mensagens, contadores, limpeza) | ✅ Implementado, 27 testes automatizados a passar; validado com Users + Recipe reais via HTTP |
-| Activity Service | ⏳ Esqueleto. Eventos, notificações, estatísticas: Fase 4 |
-| Docker Compose (4 serviços + 4 BDs, volumes, health checks) | ✅ Escrito e YAML validado — **ainda não executado** (sem Docker no ambiente de desenvolvimento) |
-| Aplicação Flutter (`mobile_app/`) | ❌ Por começar |
-| Seed de dados, relatório, guião de demonstração | ❌ Fases 2–6 |
+| **Users Service** (registo, login JWT, perfis, interesses, seguidores) | ✅ 23 testes |
+| **Recipe Service** (CRUD, categorias, pesquisa, imagens, visualizações, personalização) | ✅ 30 testes |
+| **Interaction Service** (comentários, gostos, avaliações, favoritos, partilhas, mensagens) | ✅ 27 testes |
+| **Activity Service** (eventos, notificações, estatísticas) | ✅ 24 testes |
+| **App Flutter** (`mobile_app/`) | ✅ Escrita; testes unitários incluídos — compilar e executar com `flutter analyze` / `flutter run` |
+| **Seed de dados** (`scripts/seed.py`) | ✅ Idempotente, só biblioteca padrão do Python |
+| **Teste ponta-a-ponta** (`scripts/e2e_local.py`) | ✅ 19 verificações, incluindo desligar serviços |
+| **Docker Compose** | ⚠️ Escrito e validado em YAML; **ainda por executar** com Docker/PostgreSQL reais |
+| Relatório e guião do vídeo | 📝 Rascunhos em `docs/` |
 
-## Arrancar o backend
+## Arrancar tudo (Windows PowerShell)
 
-```bash
-cp .env.example .env        # ajusta os segredos se quiseres
+```powershell
+# 1) Backend
+copy .env.example .env
 docker compose up --build
+
+# 2) Dados de demonstração (noutro terminal, na raiz do projeto)
+python scripts\seed.py            # contas: ana_cozinha, rui_chef, ... / password Tastelume123
+
+# 3) App
+cd mobile_app
+.\setup_platforms.ps1             # só da primeira vez
+flutter run
 ```
 
 | Serviço | Porta | Swagger |
@@ -29,34 +40,35 @@ docker compose up --build
 | Interaction | 8003 | http://localhost:8003/docs |
 | Activity | 8004 | http://localhost:8004/docs |
 
-O Users Service aplica as migrações (`alembic upgrade head`) ao arrancar.
+Cada serviço aplica as suas migrações (`alembic upgrade head`) ao arrancar.
 
 ## Testes
 
-```bash
-cd services/users_service        # ou recipe_service, interaction_service
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements-dev.txt
-python -m pytest -q
-```
+Ver [docs/testes.md](docs/testes.md). Resumo: `python -m pytest -q` em cada pasta de `services/`; `python scripts\e2e_local.py` (sem Docker); `flutter test` em `mobile_app/`.
 
-## Endereço do backend na app Flutter (quando existir)
+## Endereço do backend na app
 
-- Emulador Android: `http://10.0.2.2:8001` (o `localhost` do emulador é o próprio emulador).
-- Simulador iOS: `http://localhost:8001`.
-- Telemóvel físico: IP do computador na rede local, p. ex. `http://192.168.1.20:8001`.
+Emulador Android `10.0.2.2` · Simulador iOS `localhost` · Telemóvel físico: IP do PC na rede local. Configurável na app (ícone de servidor no login) ou com `--dart-define=API_HOST=...`.
 
 ## Estrutura
 
 ```
 tastelume/
-├── mobile_app/                 # Flutter (por criar)
+├── mobile_app/                 # Flutter (MVVM + Provider)
 ├── services/
-│   ├── users_service/          # completo
-│   ├── recipe_service/         # completo
-│   ├── interaction_service/    # completo
-│   └── activity_service/       # esqueleto
-├── docs/architecture.md
+│   ├── users_service/
+│   ├── recipe_service/
+│   ├── interaction_service/
+│   └── activity_service/
+├── scripts/
+│   ├── seed.py                 # dados de demonstração
+│   └── e2e_local.py            # teste ponta-a-ponta sem Docker
+├── docs/
+│   ├── architecture.md
+│   ├── testes.md
+│   ├── guiao-demo.md
+│   └── relatorio.md
+├── tastelume_diagramas.zip
 ├── docker-compose.yml
 └── .env.example
 ```

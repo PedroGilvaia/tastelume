@@ -1,4 +1,3 @@
-[Uploading architecture.md…]()
 # Arquitetura
 
 ## Serviços
@@ -155,3 +154,54 @@ Sem tempo real: a app consulta `GET /messages/{id}?after_id=<último>` periodica
 | GET /messages/{user_id} `?after_id&limit` | JWT | 200 |
 | POST /messages/{user_id} | JWT | 201, 400, 404, 422, 503 |
 | DELETE /internal/recipes/{id}/data · POST /internal/recipes/{id}/resync-counters | X-Internal-Token | 204, 401, 403 |
+
+
+---
+
+# Activity Service (Fase 4)
+
+## Eventos
+Os outros serviços enviam eventos best-effort para `POST /internal/events` (201 `{event_id, notifications_created}`). Cada evento fica guardado (tabela `events`, só se acrescenta) e pode gerar notificações (tabela `notifications`).
+
+| `event_type` | Origem | Notificação |
+|---|---|---|
+| `follow` | Users | `target_user_id` (o seguido) |
+| `like` · `comment` · `rating` | Interaction | `target_user_id`; se faltar, o `recipe_owner_id` |
+| `share` | Interaction | `target_user_id` (destinatário) |
+| `message` | Interaction | `target_user_id` (destinatário) |
+| `recipe_created` | Recipe | todos os seguidores do autor (pedidos ao Users Service; máx. `MAX_FANOUT`=5000) |
+| `view` | Recipe | nenhuma (só estatísticas; `actor_id` nulo = visitante anónimo) |
+
+Regras:
+- Nunca se notifica o próprio autor da ação (`actor_id == target_user_id`).
+- `follow` e `message` ignoram `recipe_id`/`recipe_owner_id`: o Users Service envia `recipe_owner_id` = utilizador seguido, que não descreve nenhuma receita e falsearia as estatísticas.
+- **Sem duplicados por ler**: `follow`, `like`, `rating` e `message` não criam nova notificação enquanto houver uma por ler do mesmo autor (e receita). Gostar, retirar e voltar a gostar não enche a caixa. Comentários e partilhas são sempre distintos.
+- Se o Users Service não responder num `recipe_created`, o evento fica registado e ninguém é notificado; o remetente recebe 201 na mesma.
+
+## Notificações
+`text` vem pronto a mostrar (pt-PT). Se o Users/Recipe Service não responder, `actor_username` e `recipe_title` vêm a `null` e o texto usa uma formulação neutra («Alguém gostou da tua receita.»). `unread-count` não depende de nenhum outro serviço (serve a consulta periódica do emblema na app). Uma notificação de outro utilizador responde 404, não 403, para não revelar que existe.
+
+## Estatísticas
+Calculadas a partir dos eventos, sempre do utilizador autenticado, em janelas de dias UTC (inclui hoje). Só contam ações de **outras pessoas ou visitantes** nas receitas do utilizador (o autor a ver ou a gostar da própria receita não conta).
+
+Representam **atividade registada**, não totais atuais: um «gosto» retirado não desce, e receitas apagadas continuam a contar nos totais. Os totais atuais por receita vêm dos contadores do Recipe Service. Em `top-recipes`, `title` é `null` se o Recipe Service não responder.
+
+## API do Activity Service
+| Método e caminho | Auth | Respostas |
+|---|---|---|
+| POST /internal/events | X-Internal-Token | 201, 401, 403, 422 |
+| GET /notifications `?unread_only&limit&offset` | JWT | 200 (+`X-Total-Count`, `X-Unread-Count`), 401, 422 |
+| GET /notifications/unread-count | JWT | 200 `{unread}`, 401 |
+| POST /notifications/{id}/read | JWT (dono) | 204 (idempotente), 401, 404 |
+| POST /notifications/read-all | JWT | 204, 401 |
+| GET /stats/me `?days=30` (1–365) | JWT | 200 `{period_days, totals}`, 401, 422 |
+| GET /stats/me/timeline `?days=7` (1–90) | JWT | 200 (um ponto por dia, zeros incluídos) |
+| GET /stats/me/top-recipes `?days&limit&sort` | JWT | 200 (`sort` ∈ views, likes, comments, ratings, shares) |
+| GET /health | — | 200 / 503 |
+
+
+# App Flutter e scripts (Fases 5–6)
+
+- **App:** `mobile_app/` (ver o seu README). Um `ApiClient` único com o JWT; quatro clientes de API; um ViewModel por ecrã com estado separado por serviço, para degradar apenas a parte afetada.
+- **Seed:** `scripts/seed.py` usa apenas a API pública (como a app). É idempotente: utilizadores, receitas (por título e autor) e comentários não se duplicam. As fotografias são geradas em Python puro (PNG).
+- **E2E:** `scripts/e2e_local.py` arranca os 4 serviços com SQLite e Alembic, corre o seed duas vezes e valida fluxos entre serviços e degradação com serviços desligados.
